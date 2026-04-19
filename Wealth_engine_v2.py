@@ -310,7 +310,7 @@ def reset_password(email, new_password):
 
 # ============================================================
 # PART 6: User Functions
-PART 6: User Functions & Database Operations
+
 # ============================================================
 
 def register_user(email, password, full_name):
