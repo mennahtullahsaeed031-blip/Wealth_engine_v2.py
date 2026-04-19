@@ -316,10 +316,10 @@ def register_user(email, password, full_name):
       cursor = conn.cursor()
         try:
            cursor.execute("""
-    INSERT INTO users (email, password_hash, full_name, plan)
+              INSERT INTO users (email, password_hash, full_name, plan)
     VALUES (?, ?, ?, 'free')
          """, (email.strip().lower(), hash_password(password), full_name.strip()))
-     conn.commit()
+        conn.commit()
         return True, "✅ Account created!"
         except sqlite3.IntegrityError:
         return False, "❌ Email already exists!"
