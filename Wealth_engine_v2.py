@@ -315,10 +315,12 @@ def register_user(email, password, full_name):
     with get_conn() as conn:
         cursor = conn.cursor()
         try:
+            # تأكدي إن الأسطر اللي تحت دي متزاحة يمين بنفس المقدار
             cursor.execute("""
                 INSERT INTO users (email, password_hash, full_name, plan)
                 VALUES (?, ?, ?, 'free')
             """, (email.strip().lower(), hash_password(password), full_name.strip()))
+            
             conn.commit()
             return True, "✅ Account created!"
         except sqlite3.IntegrityError:
