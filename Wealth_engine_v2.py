@@ -314,7 +314,7 @@ def reset_password(email, new_password):
 def register_user(email, password, full_name):
     with get_conn() as conn:            
       cursor = conn.cursor()
-        try:
+      try:
            cursor.execute("""
               INSERT INTO users (email, password_hash, full_name, plan)
     VALUES (?, ?, ?, 'free')
