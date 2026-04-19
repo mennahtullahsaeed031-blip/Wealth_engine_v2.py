@@ -1078,16 +1078,13 @@ def show_dashboard():
                 norm_sp  = (sp500_data / sp500_data.iloc[0]) * 100
 
 # تأكد إن norm_p مش فاضية
-if norm_p.dropna().empty:
-    st.warning("Not enough data for benchmark comparison")
-else:
-    bench_df = pd.DataFrame({
-        'Your Portfolio': norm_p,
-        'S&P 500'       : norm_sp
-    }).dropna()
 
-    if bench_df.empty:
-        st.warning("No overlapping dates between portfolio and S&P 500")
+            st.warning("Not enough data for benchmark comparison")
+        else:
+            bench_df = pd.DataFrame({
+                'Your Portfolio': norm_p,
+                'S&P 500': norm_sp
+            }
     else:
         fig_b = px.line(bench_df, ...)
         st.plotly_chart(fig_b, ...)
