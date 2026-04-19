@@ -312,9 +312,7 @@ def reset_password(email, new_password):
 # PART 6: User Functions
 
 # ============================================================
-
 def register_user(email, password, full_name):
-    """بيسجل مستخدم جديد وبيخلي خطته Free تلقائياً"""
     with get_conn() as conn:
         cursor = conn.cursor()
         try:
@@ -323,47 +321,22 @@ def register_user(email, password, full_name):
                 VALUES (?, ?, ?, 'free')
             """, (email.strip().lower(), hash_password(password), full_name.strip()))
             conn.commit()
-            return True, "✅ Account created! Please login."
+            return True, "✅ Account created!"
         except sqlite3.IntegrityError:
             return False, "❌ Email already exists!"
 
 def login_user(email, password):
-    """التحقق من الدخول وإدارة الـ Admin والـ Daily Reset للمحاولات"""
-    # 1. Admin Login
     if email.strip().lower() == ADMIN_EMAIL.lower() and password == ADMIN_PASSWORD:
-        return "admin", {
-            "id": 0, "email": ADMIN_EMAIL, "full_name": "Admin", 
-            "plan": "admin", "analyses_count": 0, "analyses_date": date.today().isoformat()
-        }
-
-    # 2. Regular User Login
+        return "admin", {"id": 0, "email": ADMIN_EMAIL, "full_name": "Admin", "plan": "admin"}
     with get_conn() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM users WHERE email = ?", (email.strip().lower(),))
         row = cursor.fetchone()
-        
-        if not row or not verify_password(password, row["password_hash"]):
-            return False, None
-
-        today = date.today().isoformat()
-        analyses_count = row["analyses_count"]
-
-        # Reset daily limit if it's a new day
-        if row["analyses_date"] != today:
-            analyses_count = 0
-            cursor.execute("""
-                UPDATE users SET analyses_count = 0, analyses_date = ?, last_login = ?
-                WHERE email = ?
-            """, (today, datetime.now().strftime("%Y-%m-%d %H:%M"), email.strip().lower()))
-        else:
-            cursor.execute("UPDATE users SET last_login = ? WHERE email = ?", 
-                           (datetime.now().strftime("%Y-%m-%d %H:%M"), email.strip().lower()))
-        
-        conn.commit()
-        return True, dict(row)
+        if row and verify_password(password, row["password_hash"]):
+            return True, dict(row)
+        return False, None
 
 def get_user_from_db(email):
-    """تحديث بيانات الجلسة من الداتابيز"""
     if email == ADMIN_EMAIL: return st.session_state.user
     with get_conn() as conn:
         cursor = conn.cursor()
@@ -371,22 +344,7 @@ def get_user_from_db(email):
         row = cursor.fetchone()
         return dict(row) if row else None
 
-def increment_analysis(email):
-    """زيادة عداد التحليلات اليومية"""
-    if not email or email == ADMIN_EMAIL: return
-    with get_conn() as conn:
-        cursor = conn.cursor()
-        cursor.execute("UPDATE users SET analyses_count = analyses_count + 1 WHERE email = ?", (email,))
-        conn.commit()
-
-def upgrade_to_pro(email):
-    with get_conn() as conn:
-        cursor = conn.cursor()
-        cursor.execute("UPDATE users SET plan='pro' WHERE email=?", (email,))
-        conn.commit()
-
 def save_prices(data, tickers, asset_types):
-    """حفظ أسعار الإغلاق في الداتابيز لتجنب طلبها مرة أخرى"""
     saved = 0
     with get_conn() as conn:
         cursor = conn.cursor()
@@ -403,7 +361,6 @@ def save_prices(data, tickers, asset_types):
     return saved
 
 def save_metrics(risk_data, period, user_email):
-    """حفظ نتائج تحليل المخاطر في سجل المستخدم"""
     if not user_email: return
     with get_conn() as conn:
         cursor = conn.cursor()
@@ -418,7 +375,6 @@ def save_metrics(risk_data, period, user_email):
                       float(row["Sharpe Ratio"])))
             except: continue
         conn.commit()
-
 
 # ============================================================
 # PART 7: SOL 1 — yfinance مع Rate Limiter
