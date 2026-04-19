@@ -310,119 +310,74 @@ def reset_password(email, new_password):
 
 # ============================================================
 # PART 6: User Functions
+PART 6: User Functions & Database Operations
 # ============================================================
+
 def register_user(email, password, full_name):
+    """بيسجل مستخدم جديد وبيخلي خطته Free تلقائياً"""
     with get_conn() as conn:
         cursor = conn.cursor()
         try:
-            # تأكدي إن الأسطر اللي تحت دي متزاحة يمين بنفس المقدار
             cursor.execute("""
                 INSERT INTO users (email, password_hash, full_name, plan)
                 VALUES (?, ?, ?, 'free')
             """, (email.strip().lower(), hash_password(password), full_name.strip()))
-            
             conn.commit()
-            return True, "✅ Account created!"
+            return True, "✅ Account created! Please login."
         except sqlite3.IntegrityError:
             return False, "❌ Email already exists!"
 
 def login_user(email, password):
-    # SOL 4: تحقق إن المستخدم مش الـ Admin
-    # الـ Admin بيدخل بطريقة مختلفة
+    """التحقق من الدخول وإدارة الـ Admin والـ Daily Reset للمحاولات"""
+    # 1. Admin Login
     if email.strip().lower() == ADMIN_EMAIL.lower() and password == ADMIN_PASSWORD:
         return "admin", {
-            "id"            : 0,
-            "email"         : ADMIN_EMAIL,
-            "full_name"     : "Admin",
-            "plan"          : "admin",
-            "analyses_count": 0,
-            "analyses_date" : date.today().isoformat()
+            "id": 0, "email": ADMIN_EMAIL, "full_name": "Admin", 
+            "plan": "admin", "analyses_count": 0, "analyses_date": date.today().isoformat()
         }
 
+    # 2. Regular User Login
     with get_conn() as conn:
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, email, full_name, plan,
-                   analyses_count, analyses_date, password_hash
-            FROM users WHERE email = ?
-        """, (email.strip().lower(),))
-
+        cursor.execute("SELECT * FROM users WHERE email = ?", (email.strip().lower(),))
         row = cursor.fetchone()
-        if not row:
+        
+        if not row or not verify_password(password, row["password_hash"]):
             return False, None
 
-        # SOL 2: استخدام verify_password بدل مقارنة مباشرة
-        if not verify_password(password, row["password_hash"]):
-            return False, None
-
-        today          = date.today().isoformat()
+        today = date.today().isoformat()
         analyses_count = row["analyses_count"]
 
-        # Daily Reset
+        # Reset daily limit if it's a new day
         if row["analyses_date"] != today:
             analyses_count = 0
             cursor.execute("""
-                UPDATE users
-                SET analyses_count = 0, analyses_date = ?, last_login = ?
+                UPDATE users SET analyses_count = 0, analyses_date = ?, last_login = ?
                 WHERE email = ?
-            """, (today, datetime.now().strftime("%Y-%m-%d %H:%M"),
-                  email.strip().lower()))
+            """, (today, datetime.now().strftime("%Y-%m-%d %H:%M"), email.strip().lower()))
         else:
-            cursor.execute("""
-                UPDATE users SET last_login = ? WHERE email = ?
-            """, (datetime.now().strftime("%Y-%m-%d %H:%M"),
-                  email.strip().lower()))
-
+            cursor.execute("UPDATE users SET last_login = ? WHERE email = ?", 
+                           (datetime.now().strftime("%Y-%m-%d %H:%M"), email.strip().lower()))
+        
         conn.commit()
-
-        return True, {
-            "id"            : row["id"],
-            "email"         : row["email"],
-            "full_name"     : row["full_name"],
-            "plan"          : row["plan"],
-            "analyses_count": analyses_count,
-            "analyses_date" : today
-        }
-
+        return True, dict(row)
 
 def get_user_from_db(email):
-    if email == ADMIN_EMAIL:
-        return st.session_state.user
+    """تحديث بيانات الجلسة من الداتابيز"""
+    if email == ADMIN_EMAIL: return st.session_state.user
     with get_conn() as conn:
         cursor = conn.cursor()
-        today  = date.today().isoformat()
-        cursor.execute("""
-            SELECT id, email, full_name, plan,
-                   analyses_count, analyses_date
-            FROM users WHERE email = ?
-        """, (email,))
+        cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
         row = cursor.fetchone()
-        if not row: return None
-        analyses_count = row["analyses_count"]
-        if row["analyses_date"] != today:
-            analyses_count = 0
-            cursor.execute("""
-                UPDATE users SET analyses_count=0, analyses_date=? WHERE email=?
-            """, (today, email))
-            conn.commit()
-        return {
-            "id": row["id"], "email": row["email"],
-            "full_name": row["full_name"], "plan": row["plan"],
-            "analyses_count": analyses_count, "analyses_date": today
-        }
-
+        return dict(row) if row else None
 
 def increment_analysis(email):
+    """زيادة عداد التحليلات اليومية"""
     if not email or email == ADMIN_EMAIL: return
-    today = date.today().isoformat()
     with get_conn() as conn:
         cursor = conn.cursor()
-        cursor.execute("""
-            UPDATE users SET analyses_count=analyses_count+1, analyses_date=?
-            WHERE email=?
-        """, (today, email))
+        cursor.execute("UPDATE users SET analyses_count = analyses_count + 1 WHERE email = ?", (email,))
         conn.commit()
-
 
 def upgrade_to_pro(email):
     with get_conn() as conn:
@@ -430,60 +385,38 @@ def upgrade_to_pro(email):
         cursor.execute("UPDATE users SET plan='pro' WHERE email=?", (email,))
         conn.commit()
 
-
-def downgrade_to_free(email):
-    with get_conn() as conn:
-        cursor = conn.cursor()
-        cursor.execute("UPDATE users SET plan='free' WHERE email=?", (email,))
-        conn.commit()
-
-
 def save_prices(data, tickers, asset_types):
+    """حفظ أسعار الإغلاق في الداتابيز لتجنب طلبها مرة أخرى"""
     saved = 0
     with get_conn() as conn:
         cursor = conn.cursor()
         for ticker in tickers:
-            try:
-                asset_type = asset_types.get(ticker, 'stock')
-                col = data[ticker] if ticker in data.columns else data
-                for date_idx, price in col.items():
-                    try:
-                        cursor.execute("""
-                            INSERT OR IGNORE INTO stock_prices
-                            (ticker, price_date, close_price, asset_type)
-                            VALUES (?, ?, ?, ?)
-                        """, (ticker, str(date_idx.date()),
-                              round(float(price), 4), asset_type))
-                        saved += 1
-                    except: pass
-            except: pass
+            asset_type = asset_types.get(ticker, 'stock')
+            col = data[ticker] if ticker in data.columns else data
+            for date_idx, price in col.items():
+                cursor.execute("""
+                    INSERT OR IGNORE INTO stock_prices (ticker, price_date, close_price, asset_type)
+                    VALUES (?, ?, ?, ?)
+                """, (ticker, str(date_idx.date()), round(float(price), 4), asset_type))
+                saved += 1
         conn.commit()
     return saved
 
-
 def save_metrics(risk_data, period, user_email):
+    """حفظ نتائج تحليل المخاطر في سجل المستخدم"""
     if not user_email: return
     with get_conn() as conn:
         cursor = conn.cursor()
         for row in risk_data:
             try:
                 cursor.execute("""
-                    INSERT INTO stock_metrics
-                    (user_email, ticker, period, asset_type,
-                     total_return, volatility, sharpe_ratio,
-                     beta, alpha, max_drawdown, var_95)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    user_email, row["Asset"], period,
-                    row.get("Type", "stock").lower(),
-                    float(str(row["Return"]).replace("%", "")),
-                    float(str(row["Volatility"]).replace("%", "")),
-                    float(row["Sharpe Ratio"]), float(row["Beta"]),
-                    float(row["Alpha"]),
-                    float(str(row["Max Drawdown"]).replace("%", "")),
-                    float(str(row["VaR (95%)"]).replace("%", ""))
-                ))
-            except: pass
+                    INSERT INTO stock_metrics (user_email, ticker, period, total_return, volatility, sharpe_ratio)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (user_email, row["Asset"], period, 
+                      float(str(row["Return"]).replace("%","")), 
+                      float(str(row["Volatility"]).replace("%","")), 
+                      float(row["Sharpe Ratio"])))
+            except: continue
         conn.commit()
 
 
