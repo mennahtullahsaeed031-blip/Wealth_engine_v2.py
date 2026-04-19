@@ -315,10 +315,10 @@ def register_user(email, password, full_name):
     with get_conn() as conn:
         cursor = conn.cursor()
         try:
-            cursor.execute("""
-                INSERT INTO users (email, password_hash, full_name)
-                VALUES (?, ?, ?)
-            """, (email.strip().lower(), hash_password(password), full_name.strip()))
+           cursor.execute("""
+    INSERT INTO users (email, password_hash, full_name, plan)
+    VALUES (?, ?, ?, 'free')
+         """, (email.strip().lower(), hash_password(password), full_name.strip()))
             conn.commit()
             return True, "✅ Account created!"
         except sqlite3.IntegrityError:
@@ -1066,15 +1066,36 @@ def show_dashboard():
                 msg = (f"✅ Beat S&P 500 by **{diff:.1f}%**!" if diff>0
                        else f"⚠️ Underperformed by **{abs(diff):.1f}%**")
                 st.success(msg) if diff>0 else st.warning(msg)
-                norm_p  = data.mean(axis=1); norm_p = (norm_p/norm_p.iloc[0])*100
-                norm_sp = (sp500_data/sp500_data.iloc[0])*100
-                bench_df = pd.DataFrame({'Your Portfolio':norm_p,'S&P 500':norm_sp}).dropna()
-                fig_b = px.line(bench_df, title="Portfolio vs S&P 500",
+                # بدل المتوسط المباشر
+# نعمل Normalized لكل سهم الأول وبعدين ناخد المتوسط
+                normalized_each = data.div(data.iloc[0]) * 100
+# div(data.iloc[0]) = كل سهم يبدأ من 100
+# بعدين المتوسط بيبقى منطقي
+                norm_p = normalized_each.mean(axis=1)
+# دلوقتي المتوسط بين أرقام كلها حوالين 100
+# مش بين 180 و 50,000
+                norm_sp  = (sp500_data / sp500_data.iloc[0]) * 100
+
+# تأكد إن norm_p مش فاضية
+if norm_p.dropna().empty:
+    st.warning("Not enough data for benchmark comparison")
+else:
+    bench_df = pd.DataFrame({
+        'Your Portfolio': norm_p,
+        'S&P 500'       : norm_sp
+    }).dropna()
+
+    if bench_df.empty:
+        st.warning("No overlapping dates between portfolio and S&P 500")
+    else:
+        fig_b = px.line(bench_df, ...)
+        st.plotly_chart(fig_b, ...)
+        fig_b = px.line(bench_df, title="Portfolio vs S&P 500",
                                 color_discrete_map={'Your Portfolio':'#00b4d8','S&P 500':'#f4a261'})
-                fig_b.update_layout(paper_bgcolor='#0f1117', plot_bgcolor='#1e2130', font={'color':'white'})
-                st.plotly_chart(fig_b, use_container_width=True)
-            except Exception as e:
-                st.warning(f"Benchmark error: {e}")
+        fig_b.update_layout(paper_bgcolor='#0f1117', plot_bgcolor='#1e2130', font={'color':'white'})
+        st.plotly_chart(fig_b, use_container_width=True)
+        except Exception as e:
+        st.warning(f"Benchmark error: {e}")
 
         # Comparison Chart
         st.markdown("### 🥇 Multi-Asset Comparison")
