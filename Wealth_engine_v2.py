@@ -320,9 +320,9 @@ def register_user(email, password, full_name):
     VALUES (?, ?, ?, 'free')
          """, (email.strip().lower(), hash_password(password), full_name.strip()))
            conn.commit()
-        return True, "✅ Account created!"
+           return True, "✅ Account created!"
         except sqlite3.IntegrityError:
-        return False, "❌ Email already exists!"
+           return False, "❌ Email already exists!"
 
 
 def login_user(email, password):
