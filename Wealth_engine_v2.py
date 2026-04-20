@@ -515,7 +515,7 @@ def show_auth_page():
         - ✅ Investment Allocation
         - ✅ Full History + CSV Export
 
-        To upgrade, contact: **{CONTACT_EMAIL}**
+        *Login and click the Upgrade button to request Pro access.*
         """)
 
     with col_form:
