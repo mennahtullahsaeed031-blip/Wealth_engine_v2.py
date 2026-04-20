@@ -844,105 +844,70 @@ def show_dashboard():
 
     st.divider()
 
-    # ── FIX 2: Upgrade Banner — Request بدل Upgrade تلقائي ──
+    # ── Upgrade Banner ────────────────────────────────────────
     if not is_pro:
-        st.warning(
-            f"🆓 **Free Plan** — Upgrade to Pro for unlimited analyses & all features!\n\n"
-            f"Contact us at: **{CONTACT_EMAIL}**"
-        )
+        st.warning("🆓 **Free Plan** — Upgrade to Pro for unlimited analyses & all features!")
 
-        with st.expander("⭐ Request Pro Upgrade — $9.99/month"):
-            st.markdown(f"""
-            **How it works:**
-            1. Fill the form below
-            2. Send us the confirmation after payment
-            3. We'll upgrade your account within 24 hours
+        if st.button("⭐ Upgrade to Pro — $9.99/month",
+                     type="primary", use_container_width=True,
+                     key="show_upgrade_form"):
+            st.session_state["show_upgrade"] = True
 
-            📧 Or contact directly: **{CONTACT_EMAIL}**
-            """)
+        if st.session_state.get("show_upgrade", False):
+            st.markdown("---")
+            st.markdown("### 📋 Upgrade Request Form")
+            st.caption("Fill in your details and we will contact you to confirm your upgrade.")
 
-            # ── الفورم الكامل ─────────────────────────────────
-            req_name = st.text_input(
+            upg_name = st.text_input(
                 "Full Name *",
                 value=user["full_name"],
-                key="upg_name",
-                placeholder="Your full name"
+                key="upg_name"
             )
-            # value=user["full_name"] = بيملى اسمه تلقائياً
-            # المستخدم يقدر يعدل لو حاب
-
-            req_phone = st.text_input(
+            st.text_input(
+                "Email (auto-filled)",
+                value=user_email,
+                key="upg_email_field",
+                disabled=True
+            )
+            upg_phone = st.text_input(
                 "Phone / WhatsApp *",
                 key="upg_phone",
                 placeholder="+20 1XX XXX XXXX"
             )
-
-            req_msg = st.text_area(
-                "Message (optional)",
-                placeholder="e.g. I'd like to upgrade to Pro plan",
-                key="upgrade_msg"
+            upg_msg = st.text_area(
+                "Additional Message (optional)",
+                key="upg_msg",
+                placeholder="Any notes or questions..."
             )
 
-            # ── زرار بيفتح Gmail مباشرة بالبيانات جاهزة ──────
-            email_subject = f"Pro Upgrade Request — {user['email']}"
-            email_body = (
-                f"Name: {req_name}%0A"
-                f"Email: {user['email']}%0A"
-                f"Phone: {req_phone}%0A"
-                f"Message: {req_msg}"
-            )
-            # %0A = سطر جديد في الـ URL
-            # mailto: = بروتوكول بيفتح برنامج الإيميل
-
-            mailto_link = (
-                f"mailto:{CONTACT_EMAIL}"
-                f"?subject={email_subject}"
-                f"&body={email_body}"
-            )
-
-            st.markdown(
-                f'<a href="{mailto_link}" target="_blank">'
-                f'<button style="background:#f4a261;color:white;'
-                f'padding:10px 24px;border:none;border-radius:6px;'
-                f'cursor:pointer;font-size:15px;width:100%;">'
-                f'📧 Send Request via Gmail</button></a>',
-                unsafe_allow_html=True
-            )
-            # unsafe_allow_html = بيسمح بـ HTML في Streamlit
-            # عشان نعمل زرار يفتح Gmail بالبيانات جاهزة
-
-            st.markdown("")
-            # سطر فراغ بين الزرارين
-
-            # ── زرار تاني يحفظ في الداتابيز برضو ─────────────
-            if st.button("📨 Save Request in System",
-                         use_container_width=True):
-                if not req_phone.strip():
-                    st.warning("⚠️ Please enter your phone number")
-                else:
-                    full_msg = (
-                        f"Name: {req_name} | "
-                        f"Phone: {req_phone} | "
-                        f"Message: {req_msg}"
-                    )
-                    ok, msg = submit_upgrade_request(
-                        user_email,
-                        user["full_name"],
-                        full_msg
-                    )
-                    # submit_upgrade_request = بتحفظ في الداتابيز بس
-                    # مش بتعمل Upgrade تلقائي
-                    # الـ Admin هو اللي يوافق من لوحة التحكم ✅
-                    if ok:
-                        st.success(
-                            f"✅ Request saved! "
-                            f"We'll contact you at **{user_email}** "
-                            f"within 24 hours."
-                        )
+            col_send, col_cancel = st.columns(2)
+            with col_send:
+                if st.button("📨 Send Request", type="primary",
+                             use_container_width=True, key="send_upg"):
+                    if not upg_phone.strip():
+                        st.warning("⚠️ Phone number is required")
                     else:
-                        st.warning(msg)
+                        full_msg = (
+                            f"Name: {upg_name} | "
+                            f"Phone: {upg_phone} | "
+                            f"Notes: {upg_msg}"
+                        )
+                        ok, msg = submit_upgrade_request(
+                            user_email,
+                            upg_name,
+                            full_msg
+                        )
+                        if ok:
+                            st.success("✅ Request sent! We will contact you soon.")
+                            st.session_state["show_upgrade"] = False
+                        else:
+                            st.warning(msg)
+            with col_cancel:
+                if st.button("✖ Cancel", use_container_width=True,
+                             key="cancel_upg"):
+                    st.session_state["show_upgrade"] = False
+                    st.rerun()
 
-            st.caption(f"📧 Direct email: {CONTACT_EMAIL}")
 
     st.divider()
 
