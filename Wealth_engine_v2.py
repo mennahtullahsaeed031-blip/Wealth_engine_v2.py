@@ -359,12 +359,25 @@ def save_prices(data, tickers, asset_types):
     return saved
 
 
+def safe_float(val, default=0.0):
+    # بتحول أي قيمة لرقم آمن
+    # لو nan أو None أو فيه % → بترجع default
+    try:
+        result = float(str(val).replace("%","").replace("nan","").strip())
+        if result != result:  # nan != nan دايماً True
+            return default
+        return result
+    except:
+        return default
+
+
 def save_metrics(risk_data, period, user_email):
     if not user_email: return
     with get_conn() as conn:
         cursor = conn.cursor()
         for row in risk_data:
             try:
+                # safe_float = بتتأكد إن القيمة مش nan قبل الحفظ
                 cursor.execute("""
                     INSERT INTO stock_metrics
                     (user_email, ticker, period, asset_type,
@@ -374,12 +387,13 @@ def save_metrics(risk_data, period, user_email):
                 """, (
                     user_email, row["Asset"], period,
                     row.get("Type","stock").lower(),
-                    float(str(row["Return"]).replace("%","")),
-                    float(str(row["Volatility"]).replace("%","")),
-                    float(row["Sharpe Ratio"]), float(row["Beta"]),
-                    float(row["Alpha"]),
-                    float(str(row["Max Drawdown"]).replace("%","")),
-                    float(str(row["VaR (95%)"]).replace("%",""))
+                    safe_float(row["Return"]),
+                    safe_float(row["Volatility"]),
+                    safe_float(row["Sharpe Ratio"]),
+                    safe_float(row["Beta"]),
+                    safe_float(row["Alpha"]),
+                    safe_float(row["Max Drawdown"]),
+                    safe_float(row["VaR (95%)"])
                 ))
             except: pass
         conn.commit()
@@ -468,6 +482,138 @@ st.set_page_config(
     page_icon="📈",
     layout="wide"
 )
+
+# ─── Custom CSS ───────────────────────────────────────────────
+st.markdown("""
+<style>
+/* Font */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@400;600;700&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'DM Sans', sans-serif;
+}
+
+/* Background */
+.stApp {
+    background: linear-gradient(135deg, #0a0e1a 0%, #0d1117 50%, #0a0f1e 100%);
+}
+
+/* Metric Cards */
+[data-testid="metric-container"] {
+    background: linear-gradient(135deg, #1a1f2e 0%, #151a28 100%);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 16px 20px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+[data-testid="metric-container"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0,180,216,0.15);
+}
+
+/* Metric label */
+[data-testid="metric-container"] label {
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+    color: rgba(255,255,255,0.45) !important;
+}
+
+/* Metric value */
+[data-testid="metric-container"] [data-testid="stMetricValue"] {
+    font-family: 'Space Grotesk', sans-serif !important;
+    font-size: 26px !important;
+    font-weight: 700 !important;
+    color: #ffffff !important;
+}
+
+/* Dataframe */
+[data-testid="stDataFrame"] {
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+}
+
+/* Buttons */
+.stButton > button {
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.02em !important;
+    transition: all 0.2s ease !important;
+}
+.stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, #00b4d8, #0077b6) !important;
+    border: none !important;
+    color: white !important;
+}
+.stButton > button[kind="primary"]:hover {
+    background: linear-gradient(135deg, #00caf0, #0096c7) !important;
+    box-shadow: 0 4px 20px rgba(0,180,216,0.4) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* Input fields */
+.stTextInput > div > div > input,
+.stTextArea > div > div > textarea,
+.stSelectbox > div > div {
+    background: #1a1f2e !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    border-radius: 8px !important;
+    color: white !important;
+}
+
+/* Expander */
+[data-testid="stExpander"] {
+    background: #131824 !important;
+    border: 1px solid rgba(255,255,255,0.07) !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+}
+[data-testid="stExpander"] summary {
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    color: rgba(255,255,255,0.85) !important;
+    padding: 14px 18px !important;
+}
+
+/* Divider */
+hr {
+    border-color: rgba(255,255,255,0.06) !important;
+    margin: 20px 0 !important;
+}
+
+/* Warning / Success / Error */
+[data-testid="stAlert"] {
+    border-radius: 10px !important;
+    border-left-width: 4px !important;
+    font-size: 14px !important;
+}
+
+/* Tabs */
+.stTabs [data-baseweb="tab-list"] {
+    background: #0d1117 !important;
+    border-radius: 10px !important;
+    padding: 4px !important;
+    gap: 4px !important;
+}
+.stTabs [data-baseweb="tab"] {
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+    color: rgba(255,255,255,0.5) !important;
+    padding: 8px 18px !important;
+}
+.stTabs [aria-selected="true"] {
+    background: #1a1f2e !important;
+    color: white !important;
+}
+
+/* Hide Streamlit branding */
+#MainMenu, footer, header { visibility: hidden; }
+</style>
+""", unsafe_allow_html=True)
 
 init_database()
 
@@ -1044,175 +1190,35 @@ def show_dashboard():
 
         st.divider()
 
-        # Asset Summary
+        # ── الـ Layout الجديد ─────────────────────────────────
+        # فكرة: نحسب كل البيانات الأول
+        # وبعدين نعرضها في Layout منظم بـ Expanders
+
         type_emoji = {'stock':'🏢','crypto':'🪙','commodity':'🥇',
                       'bond':'📊','egypt':'🇪🇬'}
-        c1,c2,c3,c4,c5 = st.columns(5)
-        c1.metric("🏢 Stocks",      sum(1 for t in tickers if asset_types.get(t)=='stock'))
-        c2.metric("🪙 Crypto",      sum(1 for t in tickers if asset_types.get(t)=='crypto'))
-        c3.metric("🥇 Commodities", sum(1 for t in tickers if asset_types.get(t)=='commodity'))
-        c4.metric("📊 Bonds",       sum(1 for t in tickers if asset_types.get(t)=='bond'))
-        c5.metric("🇪🇬 Egypt",      sum(1 for t in tickers if asset_types.get(t)=='egypt'))
 
-        # Portfolio Overview
-        st.markdown("### 📊 Portfolio Overview")
+        # ── حساب Overview ────────────────────────────────────
         overview = []
         for ticker in tickers:
             try:
-                ret    = ((data[ticker].iloc[-1]/data[ticker].iloc[0])-1)*100
+                clean_col = data[ticker].dropna()
+                if len(clean_col) < 2: continue
+                ret    = ((float(clean_col.iloc[-1]) / float(clean_col.iloc[0])) - 1) * 100
                 sharpe = (returns[ticker].mean()*252)/(returns[ticker].std()*np.sqrt(252))
-                price  = float(data[ticker].iloc[-1])
+                vol    = returns[ticker].std()*np.sqrt(252)*100
+                price  = float(clean_col.iloc[-1])
                 atype  = asset_types.get(ticker,'stock')
                 signal = "✅ Strong" if sharpe>1 else ("⚠️ Hold" if sharpe>0 else "🔴 Weak")
                 overview.append({
-                    "Type": type_emoji.get(atype,'📈'), "Asset": ticker,
-                    "Price": f"${price:.2f}", "Return": f"{ret:.1f}%",
-                    "Sharpe": f"{sharpe:.2f}", "Signal": signal
+                    "emoji": type_emoji.get(atype,'📈'),
+                    "ticker": ticker, "price": price,
+                    "ret": ret, "sharpe": sharpe,
+                    "vol": vol, "signal": signal,
+                    "atype": atype
                 })
             except: pass
-        if overview:
-            st.dataframe(pd.DataFrame(overview), use_container_width=True, hide_index=True)
 
-        # Normalized Chart
-        st.markdown("### 📈 Normalized Performance (Base = 100)")
-        try:
-            norm = data.div(data.iloc[0])*100
-            fig  = px.line(norm, title="All assets start at 100 — shows relative growth")
-            fig.update_layout(paper_bgcolor='#0f1117', plot_bgcolor='#1e2130',
-                              font={'color':'white'}, hovermode='x unified')
-            st.plotly_chart(fig, use_container_width=True)
-        except Exception as e:
-            st.warning(f"Chart error: {e}")
-
-        # ── FIX 1: Benchmark vs S&P 500 ──────────────────────
-        # الإصلاح: بنعمل Normalized لكل سهم الأول
-        # وبعدين ناخد المتوسط
-        # عشان نتجنب nan% اللي بيحصل لما الأسعار مختلفة جداً
-        st.markdown("### 🏆 Benchmark vs S&P 500")
-        if sp500_data is not None and len(sp500_data) > 1:
-            try:
-                # حساب عائد كل سهم منفصل
-                individual_returns = []
-                for t in tickers:
-                    try:
-                        ret = float(((data[t].iloc[-1]/data[t].iloc[0])-1)*100)
-                        if not np.isnan(ret):
-                            individual_returns.append(ret)
-                    except: pass
-
-                if not individual_returns:
-                    st.warning("Could not calculate portfolio return")
-                else:
-                    port_ret = float(np.mean(individual_returns))
-                    # المتوسط بيتحسب من العوائد % مش من الأسعار
-                    # كده مش هيطلع nan ✅
-
-                    sp_ret = float(((sp500_data.iloc[-1]/sp500_data.iloc[0])-1)*100)
-                    diff   = port_ret - sp_ret
-
-                    b1,b2,b3 = st.columns(3)
-                    b1.metric("📊 Your Portfolio", f"{port_ret:.1f}%")
-                    b2.metric("📈 S&P 500",        f"{sp_ret:.1f}%")
-                    b3.metric("🎯 vs Benchmark",   f"{diff:.1f}%",
-                              delta=f"{diff:.1f}%")
-
-                    if diff > 0:
-                        st.success(f"✅ Beat S&P 500 by **{diff:.1f}%**!")
-                    else:
-                        st.warning(f"⚠️ Underperformed by **{abs(diff):.1f}%**")
-
-                    # FIX 1: Normalized Chart للمقارنة
-                    try:
-                        # بنعمل Normalized لكل سهم الأول
-                        norm_each = data.div(data.iloc[0]) * 100
-                        # بعدين المتوسط بيبقى منطقي
-                        norm_p    = norm_each.mean(axis=1).dropna()
-                        norm_sp   = (sp500_data/sp500_data.iloc[0])*100
-
-                        # نتأكد مش فاضيين
-                        if len(norm_p) > 0 and len(norm_sp) > 0:
-                            bench_df = pd.DataFrame({
-                                'Your Portfolio': norm_p,
-                                'S&P 500'       : norm_sp
-                            }).dropna()
-
-                            if not bench_df.empty:
-                                fig_b = px.line(
-                                    bench_df,
-                                    title="Portfolio vs S&P 500 (Normalized)",
-                                    color_discrete_map={
-                                        'Your Portfolio': '#00b4d8',
-                                        'S&P 500'       : '#f4a261'
-                                    }
-                                )
-                                fig_b.update_layout(
-                                    paper_bgcolor='#0f1117',
-                                    plot_bgcolor='#1e2130',
-                                    font={'color':'white'}
-                                )
-                                st.plotly_chart(fig_b, use_container_width=True)
-                    except Exception as e:
-                        st.caption(f"Chart note: {e}")
-
-            except Exception as e:
-                st.warning(f"Benchmark error: {e}")
-        else:
-            st.info("S&P 500 data unavailable")
-
-        # Multi-Asset Comparison
-        st.markdown("### 🥇 Multi-Asset Comparison")
-        comparison  = []
-        type_label  = {'stock':'Stock','crypto':'Crypto','commodity':'Commodity',
-                       'bond':'Bond','egypt':'Egypt'}
-        for t in tickers:
-            try:
-                ret = float(((data[t].iloc[-1]/data[t].iloc[0])-1)*100)
-                if not np.isnan(ret):
-                    comparison.append({"Asset":t,"Return":ret,
-                                       "Type":type_label.get(asset_types.get(t,'stock'),'Stock')})
-            except: pass
-
-        if gold_data is not None and 'GC=F' not in tickers:
-            try:
-                g=gold_data.dropna()
-                comparison.append({"Asset":"🥇 Gold",
-                                   "Return":float(((g.iloc[-1]/g.iloc[0])-1)*100),
-                                   "Type":"Commodity"})
-            except: pass
-
-        if usd_data is not None:
-            try:
-                u=usd_data.dropna()
-                comparison.append({"Asset":"💵 USD",
-                                   "Return":float(((u.iloc[-1]/u.iloc[0])-1)*100),
-                                   "Type":"Currency"})
-            except: pass
-
-        if sp500_data is not None:
-            try:
-                comparison.append({"Asset":"📈 S&P 500",
-                                   "Return":float(((sp500_data.iloc[-1]/sp500_data.iloc[0])-1)*100),
-                                   "Type":"Index"})
-            except: pass
-
-        if comparison:
-            comp_df = pd.DataFrame(comparison)
-            fig_c   = px.bar(comp_df, x="Asset", y="Return", color="Type",
-                             title=f"Return — {period}", text="Return",
-                             color_discrete_map={
-                                 'Stock':'#00b4d8','Crypto':'#9b5de5',
-                                 'Commodity':'#f4a261','Bond':'#2a9d8f',
-                                 'Currency':'#e9c46a','Index':'#e76f51','Egypt':'#06d6a0'
-                             })
-            fig_c.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
-            fig_c.update_layout(paper_bgcolor='#0f1117', plot_bgcolor='#1e2130',
-                                font={'color':'white'})
-            st.plotly_chart(fig_c, use_container_width=True)
-            best_i = int(np.argmax([c['Return'] for c in comparison]))
-            st.info(f"🏆 Best: **{comparison[best_i]['Asset']}** = **{comparison[best_i]['Return']:.1f}%**")
-
-        # Risk Analysis
-        st.markdown("### ⚠️ Risk Analysis")
+        # ── حساب Risk Data ────────────────────────────────────
         risk_data = []
         for ticker in tickers:
             try:
@@ -1228,10 +1234,15 @@ def show_dashboard():
                         r_al=r.loc[common]; m_al=mkt.loc[common]
                         beta  = float(r_al.cov(m_al)/m_al.var())
                         alpha = float((r_al.mean()*252)-(m_al.mean()*252))
+                clean = data[ticker].dropna()
+                if len(clean) < 2: continue
+                first_price = float(clean.iloc[0])
+                last_price  = float(clean.iloc[-1])
+                ret_pct     = ((last_price / first_price) - 1) * 100
                 risk_data.append({
                     "Type"        : atype.title(),
                     "Asset"       : ticker,
-                    "Return"      : f"{((data[ticker].iloc[-1]/data[ticker].iloc[0])-1)*100:.1f}%",
+                    "Return"      : f"{ret_pct:.1f}%",
                     "Volatility"  : f"{r.std()*np.sqrt(252)*100:.1f}%",
                     "Sharpe Ratio": f"{(r.mean()*252)/(r.std()*np.sqrt(252)):.2f}",
                     "Beta"        : f"{beta:.2f}",
@@ -1240,126 +1251,290 @@ def show_dashboard():
                     "VaR (95%)"   : f"{r.quantile(0.05)*100:.2f}%",
                     "Kurtosis"    : f"{r.kurtosis():.2f}",
                 })
-            except Exception as e:
-                st.warning(f"Risk error — {ticker}: {e}")
+            except: pass
 
         if risk_data:
-            st.dataframe(pd.DataFrame(risk_data), use_container_width=True, hide_index=True)
             save_metrics(risk_data, period, user_email)
-            st.success(f"✅ Saved {rows_saved} records")
 
-        # Correlation
-        if len(tickers) > 1:
-            st.markdown("### 🔗 Correlation Heatmap")
+        # ════════════════════════════════════════════════════════
+        # ROW 1: KPI Cards — صف واحد فيه أهم الأرقام
+        # ════════════════════════════════════════════════════════
+        st.markdown("### 📊 Portfolio Snapshot")
+
+        # Portfolio Return vs Benchmark
+        individual_returns = []
+        for t in tickers:
             try:
-                corr     = returns.corr()
-                fig_corr = px.imshow(corr, text_auto=True,
-                                     color_continuous_scale='RdBu_r',
-                                     title="Asset Correlation Matrix")
-                fig_corr.update_layout(paper_bgcolor='#0f1117', font={'color':'white'})
-                st.plotly_chart(fig_corr, use_container_width=True)
-            except Exception as e:
-                st.warning(f"Correlation error: {e}")
+                clean_t = data[t].dropna()
+                if len(clean_t) >= 2:
+                    r = float(((clean_t.iloc[-1]/clean_t.iloc[0])-1)*100)
+                    if not np.isnan(r): individual_returns.append(r)
+            except: pass
 
-        # Monte Carlo — Pro Only
-        best = None
-        if is_pro:
-            st.markdown("### 🎲 Monte Carlo Simulation")
+        port_ret = float(np.mean(individual_returns)) if individual_returns else 0.0
+        sp_ret   = float(((sp500_data.iloc[-1]/sp500_data.iloc[0])-1)*100) if sp500_data is not None and len(sp500_data)>1 else None
+        diff     = port_ret - sp_ret if sp_ret is not None else None
+
+        avg_sharpe = float(np.mean([float(r["Sharpe Ratio"]) for r in risk_data])) if risk_data else 0.0
+        avg_vol    = float(np.mean([float(r["Volatility"].replace("%","")) for r in risk_data])) if risk_data else 0.0
+
+        # صف الـ KPIs الأساسية
+        kc1, kc2, kc3, kc4, kc5 = st.columns(5)
+        kc1.metric("📈 Portfolio Return",  f"{port_ret:.1f}%",
+                   delta=f"{diff:+.1f}% vs S&P" if diff is not None else None)
+        kc2.metric("📊 S&P 500",           f"{sp_ret:.1f}%" if sp_ret is not None else "N/A")
+        kc3.metric("⚡ Avg Sharpe Ratio",  f"{avg_sharpe:.2f}")
+        kc4.metric("📉 Avg Volatility",    f"{avg_vol:.1f}%")
+        kc5.metric("🔢 Assets Analyzed",   str(len(tickers)))
+
+        # AI Recommendation بعد الـ KPIs مباشرة
+        if risk_data:
             try:
-                mean_r=returns.mean(); cov_m=returns.cov(); n=len(tickers); mcs=[]
-                for _ in range(1000):
-                    w=np.random.random(n); w=w/w.sum()
-                    ret=float(np.sum(mean_r.values*w)*252)
-                    rsk=float(np.sqrt(np.dot(w.T, np.dot(cov_m.values*252,w))))
-                    mcs.append({'Return':ret,'Risk':rsk,
-                                'Sharpe':ret/rsk if rsk>0 else 0,'Weights':w})
-                rdf=pd.DataFrame(mcs)
-                best_i=int(rdf['Sharpe'].values.argmax())
-                best=rdf.iloc[best_i]
-                fig_mc=px.scatter(rdf, x='Risk', y='Return', color='Sharpe',
-                                  title='Monte Carlo: 1,000 Simulations',
-                                  color_continuous_scale='Viridis')
-                fig_mc.update_layout(paper_bgcolor='#0f1117', plot_bgcolor='#1e2130',
-                                     font={'color':'white'})
-                st.plotly_chart(fig_mc, use_container_width=True)
-                opt=[{"Asset":t,"Weight":f"{best['Weights'][i]*100:.1f}%"}
-                     for i,t in enumerate(tickers)]
-                st.dataframe(pd.DataFrame(opt), use_container_width=True, hide_index=True)
-                st.success(f"🏆 Return {best['Return']*100:.1f}% | "
-                           f"Risk {best['Risk']*100:.1f}% | "
-                           f"Sharpe {best['Sharpe']:.2f}")
-            except Exception as e:
-                st.warning(f"Monte Carlo error: {e}")
-        else:
-            st.markdown("### 🎲 Monte Carlo")
-            st.warning("⭐ Pro Feature — Request upgrade above")
+                avg_b = float(np.mean([float(r["Beta"]) for r in risk_data]))
+                if avg_sharpe > 1 and avg_b < 1.2:
+                    st.success(f"✅ **Strong Portfolio** — Well-balanced risk/return | Sharpe: {avg_sharpe:.2f} | Beta: {avg_b:.2f}")
+                elif avg_sharpe > 0 and avg_b < 1.5:
+                    st.warning(f"🟡 **Moderate Portfolio** — Consider diversifying | Sharpe: {avg_sharpe:.2f} | Beta: {avg_b:.2f}")
+                else:
+                    st.error(f"🔴 **High Risk Portfolio** — Review selection | Sharpe: {avg_sharpe:.2f} | Beta: {avg_b:.2f}")
+            except: pass
 
-        # Allocation — Pro Only
-        if is_pro and amount > 0 and best is not None:
-            st.markdown(f"### 💰 Allocation — {currency} {amount:,}")
+        st.divider()
+
+        # ════════════════════════════════════════════════════════
+        # ROW 2: Asset Type Counts + Best Asset
+        # ════════════════════════════════════════════════════════
+        tc1,tc2,tc3,tc4,tc5 = st.columns(5)
+        tc1.metric("🏢 Stocks",      sum(1 for t in tickers if asset_types.get(t)=='stock'))
+        tc2.metric("🪙 Crypto",      sum(1 for t in tickers if asset_types.get(t)=='crypto'))
+        tc3.metric("🥇 Commodities", sum(1 for t in tickers if asset_types.get(t)=='commodity'))
+        tc4.metric("📊 Bonds",       sum(1 for t in tickers if asset_types.get(t)=='bond'))
+        tc5.metric("🇪🇬 Egypt",      sum(1 for t in tickers if asset_types.get(t)=='egypt'))
+
+        st.divider()
+
+        # ════════════════════════════════════════════════════════
+        # ROW 3: Charts في عمودين جنب بعض
+        # ════════════════════════════════════════════════════════
+        chart_col1, chart_col2 = st.columns(2)
+
+        with chart_col1:
             try:
-                alloc=[]; lt=0
-                for i,t in enumerate(tickers):
-                    w=float(best['Weights'][i]); money=amount*w
-                    price=float(data[t].iloc[-1]); units=int(money/price)
-                    leftover=money-(units*price); lt+=leftover
-                    alloc.append({"Asset":t,"Type":asset_types.get(t,'stock').title(),
-                                  "Weight":f"{w*100:.1f}%","Amount":f"{money:,.0f}",
-                                  "Units":units,"Price":f"${price:.2f}",
-                                  "Leftover":f"{leftover:,.0f}"})
-                st.dataframe(pd.DataFrame(alloc), use_container_width=True, hide_index=True)
-                a1,a2,a3=st.columns(3)
-                a1.metric("💰 Total",    f"{amount:,}")
-                a2.metric("✅ Invested", f"{amount-lt:,.0f}")
-                a3.metric("🔄 Leftover", f"{lt:,.0f}")
+                norm = data.div(data.dropna().iloc[0])*100
+                fig  = px.line(norm, title="📈 Normalized Performance")
+                fig.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(15,17,23,0.8)',
+                    font={'color':'white','size':11},
+                    hovermode='x unified',
+                    margin=dict(l=10,r=10,t=40,b=10),
+                    legend=dict(orientation="h", y=-0.15)
+                )
+                st.plotly_chart(fig, use_container_width=True)
             except Exception as e:
-                st.warning(f"Allocation error: {e}")
-        elif not is_pro and amount > 0:
-            st.markdown("### 💰 Allocation")
-            st.warning("⭐ Pro Feature — Request upgrade above")
+                st.warning(f"Chart: {e}")
 
-        # Rebalancing
-        st.markdown("### 🔔 Rebalancing Alerts")
-        try:
-            vals={t:float(data[t].iloc[-1]) for t in tickers}
-            tv=sum(vals.values()); found=False
-            for t,v in vals.items():
-                w=(v/tv)*100
-                if w>40:   st.error(f"🚨 **{t}** = {w:.1f}% — exceeds 40%!"); found=True
-                elif w>30: st.warning(f"⚠️ **{t}** = {w:.1f}% — concentrated"); found=True
-            if not found: st.success("✅ Well-balanced!")
-        except Exception as e:
-            st.warning(f"Rebalancing error: {e}")
-
-        # Sentiment
-        st.markdown("### 📰 News Sentiment")
-        if TEXTBLOB_AVAILABLE:
-            scols=st.columns(min(len(tickers),3))
-            for idx,t in enumerate(tickers):
+        with chart_col2:
+            if sp500_data is not None and len(sp500_data) > 1:
                 try:
-                    news=yf.Ticker(t).news[:3]
-                    scores=[TextBlob(a.get('title','')).sentiment.polarity
-                            for a in news if a.get('title','')]
-                    if scores:
-                        avg=float(np.mean(scores))
-                        mood=("😊 Positive" if avg>0.1
-                              else "😟 Negative" if avg<-0.1 else "😐 Neutral")
-                        scols[idx%3].metric(t, mood, f"{avg:.2f}")
+                    norm_each = data.div(data.iloc[0]) * 100
+                    norm_p    = norm_each.mean(axis=1).dropna()
+                    norm_sp   = (sp500_data/sp500_data.iloc[0])*100
+                    bench_df  = pd.DataFrame({
+                        'Your Portfolio': norm_p,
+                        'S&P 500'       : norm_sp
+                    }).dropna()
+                    if not bench_df.empty:
+                        fig_b = px.line(bench_df,
+                                        title="🏆 Portfolio vs S&P 500",
+                                        color_discrete_map={
+                                            'Your Portfolio':'#00b4d8',
+                                            'S&P 500':'#f4a261'
+                                        })
+                        fig_b.update_layout(
+                            paper_bgcolor='rgba(0,0,0,0)',
+                            plot_bgcolor='rgba(15,17,23,0.8)',
+                            font={'color':'white','size':11},
+                            margin=dict(l=10,r=10,t=40,b=10),
+                            legend=dict(orientation="h", y=-0.15)
+                        )
+                        st.plotly_chart(fig_b, use_container_width=True)
+                except Exception as e:
+                    st.caption(f"Benchmark: {e}")
+
+        st.divider()
+
+        # ════════════════════════════════════════════════════════
+        # Expanders — التفاصيل بدون Scroll كتير
+        # ════════════════════════════════════════════════════════
+
+        # ── Expander 1: Portfolio Table ───────────────────────
+        with st.expander("📋 Portfolio Overview — Full Table", expanded=True):
+            if overview:
+                overview_df = pd.DataFrame([{
+                    "": o["emoji"], "Asset": o["ticker"],
+                    "Price": f"${o['price']:.2f}",
+                    "Return": f"{o['ret']:.1f}%",
+                    "Sharpe": f"{o['sharpe']:.2f}",
+                    "Volatility": f"{o['vol']:.1f}%",
+                    "Signal": o["signal"]
+                } for o in overview])
+                st.dataframe(overview_df, use_container_width=True, hide_index=True)
+
+        # ── Expander 2: Multi-Asset Comparison ────────────────
+        with st.expander("🥇 Multi-Asset Return Comparison"):
+            comparison  = []
+            type_label  = {'stock':'Stock','crypto':'Crypto','commodity':'Commodity',
+                           'bond':'Bond','egypt':'Egypt'}
+            for t in tickers:
+                try:
+                    c = data[t].dropna()
+                    if len(c) >= 2:
+                        ret = float(((c.iloc[-1]/c.iloc[0])-1)*100)
+                        if not np.isnan(ret):
+                            comparison.append({"Asset":t,"Return":ret,
+                                               "Type":type_label.get(asset_types.get(t,'stock'),'Stock')})
+                except: pass
+            if gold_data is not None and 'GC=F' not in tickers:
+                try:
+                    g=gold_data.dropna()
+                    comparison.append({"Asset":"🥇 Gold","Return":float(((g.iloc[-1]/g.iloc[0])-1)*100),"Type":"Commodity"})
+                except: pass
+            if usd_data is not None:
+                try:
+                    u=usd_data.dropna()
+                    comparison.append({"Asset":"💵 USD","Return":float(((u.iloc[-1]/u.iloc[0])-1)*100),"Type":"Currency"})
+                except: pass
+            if sp500_data is not None:
+                try:
+                    comparison.append({"Asset":"📈 S&P 500","Return":float(((sp500_data.iloc[-1]/sp500_data.iloc[0])-1)*100),"Type":"Index"})
                 except: pass
 
-        # AI Recommendation
-        st.markdown("### 💡 AI Recommendation")
-        if risk_data:
+            if comparison:
+                comp_df = pd.DataFrame(comparison)
+                fig_c   = px.bar(comp_df, x="Asset", y="Return", color="Type",
+                                 title=f"Return Comparison — {period}", text="Return",
+                                 color_discrete_map={'Stock':'#00b4d8','Crypto':'#9b5de5',
+                                                     'Commodity':'#f4a261','Bond':'#2a9d8f',
+                                                     'Currency':'#e9c46a','Index':'#e76f51','Egypt':'#06d6a0'})
+                fig_c.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
+                fig_c.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(15,17,23,0.8)',
+                                    font={'color':'white'}, margin=dict(t=40))
+                st.plotly_chart(fig_c, use_container_width=True)
+                best_i = int(np.argmax([c['Return'] for c in comparison]))
+                st.info(f"🏆 Best: **{comparison[best_i]['Asset']}** = **{comparison[best_i]['Return']:.1f}%**")
+
+        # ── Expander 3: Risk Analysis ─────────────────────────
+        with st.expander("⚠️ Detailed Risk Analysis"):
+            if risk_data:
+                st.dataframe(pd.DataFrame(risk_data), use_container_width=True, hide_index=True)
+                st.success(f"✅ Analysis saved — {rows_saved} records stored")
+
+        # ── Expander 4: Correlation ───────────────────────────
+        if len(tickers) > 1:
+            with st.expander("🔗 Correlation Heatmap"):
+                try:
+                    corr     = returns.corr()
+                    fig_corr = px.imshow(corr, text_auto=True,
+                                         color_continuous_scale='RdBu_r',
+                                         title="Asset Correlation Matrix")
+                    fig_corr.update_layout(paper_bgcolor='rgba(0,0,0,0)',
+                                           font={'color':'white'})
+                    st.plotly_chart(fig_corr, use_container_width=True)
+                    st.caption("💡 Values near -1 = good diversification | Near +1 = move together")
+                except Exception as e:
+                    st.warning(f"Correlation: {e}")
+
+        # ── Expander 5: Rebalancing ───────────────────────────
+        with st.expander("🔔 Rebalancing Alerts"):
             try:
-                avg_s=np.mean([float(r["Sharpe Ratio"]) for r in risk_data])
-                avg_b=np.mean([float(r["Beta"])         for r in risk_data])
-                if avg_s>1 and avg_b<1.2:
-                    st.success(f"✅ **Strong** | Sharpe:{avg_s:.2f} Beta:{avg_b:.2f}")
-                elif avg_s>0 and avg_b<1.5:
-                    st.warning(f"🟡 **Moderate** | Sharpe:{avg_s:.2f} Beta:{avg_b:.2f}")
-                else:
-                    st.error(f"🔴 **High Risk** | Sharpe:{avg_s:.2f} Beta:{avg_b:.2f}")
-            except: pass
+                vals={t:float(data[t].dropna().iloc[-1]) for t in tickers}
+                tv=sum(vals.values()); found=False
+                reb_rows = []
+                for t,v in vals.items():
+                    w=(v/tv)*100
+                    status = "🚨 Overweight" if w>40 else ("⚠️ Watch" if w>30 else "✅ OK")
+                    reb_rows.append({"Asset":t, "Current Weight":f"{w:.1f}%", "Status":status})
+                st.dataframe(pd.DataFrame(reb_rows), use_container_width=True, hide_index=True)
+            except Exception as e:
+                st.warning(f"Rebalancing: {e}")
+
+        # ── Expander 6: Monte Carlo (Pro) ─────────────────────
+        best = None
+        with st.expander("🎲 Monte Carlo Simulation" + (" — ⭐ Pro" if not is_pro else "")):
+            if is_pro:
+                try:
+                    mean_r=returns.mean(); cov_m=returns.cov(); n=len(tickers); mcs=[]
+                    for _ in range(1000):
+                        w=np.random.random(n); w=w/w.sum()
+                        ret=float(np.sum(mean_r.values*w)*252)
+                        rsk=float(np.sqrt(np.dot(w.T, np.dot(cov_m.values*252,w))))
+                        mcs.append({'Return':ret,'Risk':rsk,
+                                    'Sharpe':ret/rsk if rsk>0 else 0,'Weights':w})
+                    rdf=pd.DataFrame(mcs)
+                    best_i=int(rdf['Sharpe'].values.argmax())
+                    best=rdf.iloc[best_i]
+                    fig_mc=px.scatter(rdf, x='Risk', y='Return', color='Sharpe',
+                                      title='1,000 Portfolio Simulations',
+                                      color_continuous_scale='Viridis')
+                    fig_mc.update_layout(paper_bgcolor='rgba(0,0,0,0)',
+                                         plot_bgcolor='rgba(15,17,23,0.8)',
+                                         font={'color':'white'})
+                    st.plotly_chart(fig_mc, use_container_width=True)
+                    mc1,mc2,mc3 = st.columns(3)
+                    mc1.metric("📈 Expected Return", f"{best['Return']*100:.1f}%")
+                    mc2.metric("📉 Risk",            f"{best['Risk']*100:.1f}%")
+                    mc3.metric("⚡ Sharpe",           f"{best['Sharpe']:.2f}")
+                    opt=[{"Asset":t,"Optimal Weight":f"{best['Weights'][i]*100:.1f}%"}
+                         for i,t in enumerate(tickers)]
+                    st.dataframe(pd.DataFrame(opt), use_container_width=True, hide_index=True)
+                except Exception as e:
+                    st.warning(f"Monte Carlo: {e}")
+            else:
+                st.warning("⭐ **Pro Feature** — Request upgrade above to unlock Monte Carlo Simulation")
+
+        # ── Expander 7: Investment Allocation (Pro) ───────────
+        with st.expander("💰 Investment Allocation" + (" — ⭐ Pro" if not is_pro else "")):
+            if is_pro and amount > 0 and best is not None:
+                try:
+                    alloc=[]; lt=0
+                    for i,t in enumerate(tickers):
+                        w=float(best['Weights'][i]); money=amount*w
+                        price=float(data[t].dropna().iloc[-1]); units=int(money/price)
+                        leftover=money-(units*price); lt+=leftover
+                        alloc.append({"Asset":t,"Type":asset_types.get(t,'stock').title(),
+                                      "Weight":f"{w*100:.1f}%","Amount":f"{money:,.0f}",
+                                      "Units":units,"Price/Unit":f"${price:.2f}",
+                                      "Leftover":f"{leftover:,.0f}"})
+                    st.dataframe(pd.DataFrame(alloc), use_container_width=True, hide_index=True)
+                    a1,a2,a3=st.columns(3)
+                    a1.metric("💰 Total",    f"{currency} {amount:,}")
+                    a2.metric("✅ Invested", f"{amount-lt:,.0f}")
+                    a3.metric("🔄 Leftover", f"{lt:,.0f}")
+                except Exception as e:
+                    st.warning(f"Allocation: {e}")
+            elif is_pro and best is None:
+                st.info("Run Optimize first to get allocation weights")
+            else:
+                st.warning("⭐ **Pro Feature** — Request upgrade above to unlock Investment Allocation")
+
+        # ── Expander 8: News Sentiment ────────────────────────
+        with st.expander("📰 News Sentiment Analysis"):
+            if TEXTBLOB_AVAILABLE:
+                scols=st.columns(min(len(tickers),3))
+                for idx,t in enumerate(tickers):
+                    try:
+                        news=yf.Ticker(t).news[:3]
+                        scores=[TextBlob(a.get('title','')).sentiment.polarity
+                                for a in news if a.get('title','')]
+                        if scores:
+                            avg=float(np.mean(scores))
+                            mood=("😊 Positive" if avg>0.1
+                                  else "😟 Negative" if avg<-0.1 else "😐 Neutral")
+                            scols[idx%3].metric(t, mood, f"Score: {avg:.2f}")
+                    except: pass
+            else:
+                st.info("Install textblob: pip install textblob")
 
     # History
     st.divider()
