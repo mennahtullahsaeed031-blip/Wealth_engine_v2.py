@@ -62,9 +62,9 @@ DB_PATH = "wealth_engine.db"
 # غيري الإيميل والباسورد دول لبياناتك الخاصة
 ADMIN_EMAIL    = "admin@wealthengine.com"
 ADMIN_PASSWORD = "admin2024!"
-CONTACT_EMAIL  = "admin@wealthengine.com"
-# CONTACT_EMAIL = الإيميل اللي هيشوفه المستخدم لما يطلب Upgrade
-# غيريه لإيميلك الحقيقي ✅
+CONTACT_EMAIL  = "mennahtullahsaeed031@gmail.com"
+# CONTACT_EMAIL = إيميلك الحقيقي على Gmail
+# المستخدمين هيشوفوه ويبعتوا عليه الطلبات ✅
 
 
 # ============================================================
@@ -438,7 +438,11 @@ def fetch_data_safe(tickers, period):
             rate_limiter.wait_if_needed(ticker)
             raw = yf.download(ticker, period=period,
                               progress=False, auto_adjust=True)['Close']
-            if isinstance(raw, pd.DataFrame): raw = raw.iloc[:,0]
+            # FIX MultiIndex: yfinance الجديد بيرجع ("Close","AAPL") بدل "AAPL"
+            if isinstance(raw, pd.DataFrame):
+                if isinstance(raw.columns, pd.MultiIndex):
+                    raw.columns = raw.columns.get_level_values(-1)
+                raw = raw.iloc[:,0]
             raw = raw.squeeze().dropna()
             if len(raw) < 2:
                 error_tickers.append(ticker)
@@ -449,7 +453,11 @@ def fetch_data_safe(tickers, period):
 
     if not valid_data:
         return None, [], error_tickers
-    return pd.DataFrame(valid_data), list(valid_data.keys()), error_tickers
+    data = pd.DataFrame(valid_data)
+    # FIX MultiIndex في الـ DataFrame النهائي
+    if isinstance(data.columns, pd.MultiIndex):
+        data.columns = data.columns.get_level_values(-1)
+    return data, list(valid_data.keys()), error_tickers
 
 
 # ============================================================
@@ -708,6 +716,55 @@ def show_admin_dashboard():
 
         if not users_df.empty:
             st.dataframe(users_df, use_container_width=True, hide_index=True)
+
+            # ── إدارة الـ Plan مباشرة من جدول المستخدمين ─────
+            st.markdown("#### ⚙️ Manage User Plan")
+            st.caption("Upgrade or downgrade any user directly without needing a request")
+
+            col_em, col_pl, col_btn = st.columns([2, 1, 1])
+            with col_em:
+                direct_email = st.text_input(
+                    "User Email",
+                    key="direct_email",
+                    placeholder="user@email.com"
+                )
+            with col_pl:
+                direct_action = st.selectbox(
+                    "New Plan",
+                    ["⭐ Upgrade to Pro", "⬇️ Downgrade to Free"],
+                    key="direct_action"
+                )
+            with col_btn:
+                st.markdown("&nbsp;", unsafe_allow_html=True)
+                # سطر فراغ عشان الزرار يتنازل مع الحقول
+                apply_direct = st.button(
+                    "✅ Apply",
+                    type="primary",
+                    use_container_width=True,
+                    key="apply_direct"
+                )
+
+            if apply_direct:
+                if not direct_email.strip():
+                    st.warning("⚠️ Enter user email first")
+                else:
+                    t = direct_email.strip().lower()
+                    # تحقق إن المستخدم موجود
+                    with get_conn() as check_conn:
+                        cur = check_conn.cursor()
+                        cur.execute("SELECT plan FROM users WHERE email=?", (t,))
+                        existing = cur.fetchone()
+
+                    if not existing:
+                        st.error(f"❌ User {t} not found!")
+                    elif "Upgrade" in direct_action:
+                        upgrade_to_pro(t)
+                        st.success(f"✅ {t} upgraded to Pro!")
+                        st.rerun()
+                    else:
+                        downgrade_to_free(t)
+                        st.info(f"⬇️ {t} downgraded to Free.")
+                        st.rerun()
         else:
             st.info("No users yet")
 
@@ -794,40 +851,98 @@ def show_dashboard():
             f"Contact us at: **{CONTACT_EMAIL}**"
         )
 
-        # زرار "Request Upgrade"
         with st.expander("⭐ Request Pro Upgrade — $9.99/month"):
             st.markdown(f"""
             **How it works:**
             1. Fill the form below
-            2. We'll review your request
-            3. After payment confirmation, your account will be upgraded
+            2. Send us the confirmation after payment
+            3. We'll upgrade your account within 24 hours
 
             📧 Or contact directly: **{CONTACT_EMAIL}**
             """)
 
+            # ── الفورم الكامل ─────────────────────────────────
+            req_name = st.text_input(
+                "Full Name *",
+                value=user["full_name"],
+                key="upg_name",
+                placeholder="Your full name"
+            )
+            # value=user["full_name"] = بيملى اسمه تلقائياً
+            # المستخدم يقدر يعدل لو حاب
+
+            req_phone = st.text_input(
+                "Phone / WhatsApp *",
+                key="upg_phone",
+                placeholder="+20 1XX XXX XXXX"
+            )
+
             req_msg = st.text_area(
                 "Message (optional)",
-                placeholder="e.g. I'd like to upgrade my account to Pro plan",
+                placeholder="e.g. I'd like to upgrade to Pro plan",
                 key="upgrade_msg"
             )
 
-            if st.button("📨 Send Upgrade Request", type="primary",
+            # ── زرار بيفتح Gmail مباشرة بالبيانات جاهزة ──────
+            email_subject = f"Pro Upgrade Request — {user['email']}"
+            email_body = (
+                f"Name: {req_name}%0A"
+                f"Email: {user['email']}%0A"
+                f"Phone: {req_phone}%0A"
+                f"Message: {req_msg}"
+            )
+            # %0A = سطر جديد في الـ URL
+            # mailto: = بروتوكول بيفتح برنامج الإيميل
+
+            mailto_link = (
+                f"mailto:{CONTACT_EMAIL}"
+                f"?subject={email_subject}"
+                f"&body={email_body}"
+            )
+
+            st.markdown(
+                f'<a href="{mailto_link}" target="_blank">'
+                f'<button style="background:#f4a261;color:white;'
+                f'padding:10px 24px;border:none;border-radius:6px;'
+                f'cursor:pointer;font-size:15px;width:100%;">'
+                f'📧 Send Request via Gmail</button></a>',
+                unsafe_allow_html=True
+            )
+            # unsafe_allow_html = بيسمح بـ HTML في Streamlit
+            # عشان نعمل زرار يفتح Gmail بالبيانات جاهزة
+
+            st.markdown("")
+            # سطر فراغ بين الزرارين
+
+            # ── زرار تاني يحفظ في الداتابيز برضو ─────────────
+            if st.button("📨 Save Request in System",
                          use_container_width=True):
-                ok, msg = submit_upgrade_request(
-                    user_email,
-                    user["full_name"],
-                    req_msg
-                )
-                # submit_upgrade_request = بتحفظ الطلب في الداتابيز
-                # مش بتعمل Upgrade تلقائي ❌
-                # الـ Admin هو اللي يوافق ✅
-                if ok:
-                    st.success(
-                        f"✅ Request sent! We'll contact you at **{user_email}** "
-                        f"after reviewing. Usually within 24 hours."
-                    )
+                if not req_phone.strip():
+                    st.warning("⚠️ Please enter your phone number")
                 else:
-                    st.warning(msg)
+                    full_msg = (
+                        f"Name: {req_name} | "
+                        f"Phone: {req_phone} | "
+                        f"Message: {req_msg}"
+                    )
+                    ok, msg = submit_upgrade_request(
+                        user_email,
+                        user["full_name"],
+                        full_msg
+                    )
+                    # submit_upgrade_request = بتحفظ في الداتابيز بس
+                    # مش بتعمل Upgrade تلقائي
+                    # الـ Admin هو اللي يوافق من لوحة التحكم ✅
+                    if ok:
+                        st.success(
+                            f"✅ Request saved! "
+                            f"We'll contact you at **{user_email}** "
+                            f"within 24 hours."
+                        )
+                    else:
+                        st.warning(msg)
+
+            st.caption(f"📧 Direct email: {CONTACT_EMAIL}")
 
     st.divider()
 
