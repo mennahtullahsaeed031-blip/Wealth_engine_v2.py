@@ -618,11 +618,39 @@ hr {
 init_database()
 
 if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-    st.session_state.user      = None
-    st.session_state.is_admin  = False
+    st.session_state.logged_in    = False
+    st.session_state.user         = None
+    st.session_state.is_admin     = False
+    st.session_state.saved_email  = ""
+    st.session_state.saved_admin  = False
+    # saved_email = بنحفظ الإيميل هنا
+    # بيفضل محفوظ حتى بعد Refresh
+    # عشان الـ App يعرف يرجع يجيب بيانات المستخدم
 
-# Session Refresh
+# FIX 2: Session Restore بعد Refresh
+# لو الـ logged_in اتمسح بسبب Refresh
+# بنرجع نجيب البيانات من الـ DB بالإيميل المحفوظ
+if not st.session_state.logged_in and st.session_state.saved_email:
+    email_saved = st.session_state.saved_email
+    if email_saved == ADMIN_EMAIL and st.session_state.saved_admin:
+        # رجّع الـ Admin session
+        st.session_state.logged_in = True
+        st.session_state.is_admin  = True
+        st.session_state.user      = {
+            "id": 0, "email": ADMIN_EMAIL,
+            "full_name": "Admin", "plan": "admin",
+            "analyses_count": 0,
+            "analyses_date": date.today().isoformat()
+        }
+    elif email_saved and email_saved != ADMIN_EMAIL:
+        # رجّع الـ User session من الـ DB
+        restored = get_user_from_db(email_saved)
+        if restored:
+            st.session_state.logged_in = True
+            st.session_state.user      = restored
+            st.session_state.is_admin  = False
+
+# Session Refresh — تحديث البيانات لو الـ Session موجود
 if st.session_state.logged_in and st.session_state.user:
     email_sess = st.session_state.user.get("email","")
     if email_sess and email_sess != ADMIN_EMAIL:
@@ -630,8 +658,9 @@ if st.session_state.logged_in and st.session_state.user:
         if fresh:
             st.session_state.user = fresh
         else:
-            st.session_state.logged_in = False
-            st.session_state.user      = None
+            st.session_state.logged_in   = False
+            st.session_state.user        = None
+            st.session_state.saved_email = ""
 
 
 # ============================================================
@@ -681,14 +710,20 @@ def show_auth_page():
                 else:
                     result, user = login_user(email, password)
                     if result == "admin":
-                        st.session_state.logged_in = True
-                        st.session_state.user      = user
-                        st.session_state.is_admin  = True
+                        st.session_state.logged_in   = True
+                        st.session_state.user        = user
+                        st.session_state.is_admin    = True
+                        st.session_state.saved_email = ADMIN_EMAIL
+                        st.session_state.saved_admin = True
+                        # نحفظ الإيميل عشان Refresh ميلوش session ✅
                         st.rerun()
                     elif result:
-                        st.session_state.logged_in = True
-                        st.session_state.user      = user
-                        st.session_state.is_admin  = False
+                        st.session_state.logged_in   = True
+                        st.session_state.user        = user
+                        st.session_state.is_admin    = False
+                        st.session_state.saved_email = user["email"]
+                        st.session_state.saved_admin = False
+                        # نحفظ الإيميل عشان Refresh ميلوش session ✅
                         st.rerun()
                     else:
                         st.error("❌ Invalid email or password")
@@ -711,7 +746,20 @@ def show_auth_page():
                     st.error("❌ Password must be 6+ characters")
                 else:
                     ok, msg = register_user(reg_email, reg_pass, reg_name)
-                    st.success(msg) if ok else st.error(msg)
+                    if ok:
+                        # FIX: بنحفظ رسالة النجاح في session_state
+                        # وبعدين نعمل rerun عشان نتجنب DeltaGenerator error
+                        st.session_state["reg_success"] = True
+                        st.session_state["reg_msg"]     = msg
+                        st.rerun()
+                    else:
+                        st.error(msg)
+
+            # بنعرض رسالة النجاح بره الـ button block عشان مفيش conflict
+            if st.session_state.get("reg_success", False):
+                st.success(st.session_state.get("reg_msg", "✅ Account created!"))
+                st.info("👉 Go to Login tab to sign in")
+                st.session_state["reg_success"] = False
 
         with tab_forgot:
             st.markdown("### 🔓 Reset Password")
@@ -766,9 +814,11 @@ def show_admin_dashboard():
     st.markdown("##### Investment & Wealth Engine — Control Panel")
 
     if st.button("Logout"):
-        st.session_state.logged_in = False
-        st.session_state.user      = None
-        st.session_state.is_admin  = False
+        st.session_state.logged_in   = False
+        st.session_state.user        = None
+        st.session_state.is_admin    = False
+        st.session_state.saved_email = ""
+        st.session_state.saved_admin = False
         st.rerun()
 
     st.divider()
@@ -984,8 +1034,11 @@ def show_dashboard():
             st.caption(f"Today: {user['analyses_count']}/3 ({remaining} left)")
             st.caption("🔄 Resets daily at midnight")
         if st.button("Logout", use_container_width=True):
-            st.session_state.logged_in = False
-            st.session_state.user      = None
+            st.session_state.logged_in   = False
+            st.session_state.user        = None
+            st.session_state.saved_email = ""
+            st.session_state.saved_admin = False
+            # نمسح الإيميل المحفوظ عشان ميرجعش تاني ✅
             st.rerun()
 
     st.divider()
