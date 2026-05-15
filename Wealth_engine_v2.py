@@ -1,33 +1,3 @@
-# ============================================================
-# 📈 Investment & Wealth Engine
-# Built by Mennahtullah Saeed
-# Version 3.3 — Final Fixes
-# ============================================================
-#
-# الأدوات المستخدمة:
-# Python    → لغة البرمجة
-# Streamlit → الـ App والواجهة
-# yfinance  → API الأسهم والـ Crypto
-# pandas    → الجداول والبيانات
-# numpy     → الحسابات الرياضية
-# plotly    → الـ Charts
-# SQLite    → قاعدة البيانات
-# bcrypt    → تشفير الباسورد
-# hashlib   → backup للتشفير
-# time      → Rate Limiter
-# random    → Reset Code العشوائي
-# TextBlob  → تحليل الأخبار
-#
-# الإصلاحات في النسخة دي:
-# FIX 1 → nan% في Benchmark: Normalized Portfolio بدل mean مباشر
-# FIX 2 → Upgrade بيشتغل بدون إذن: بقى Request بس مش Upgrade تلقائي
-# FIX 3 → Admin Dashboard: بيشوف الـ Requests ويوافق يدوياً
-# ============================================================
-
-
-# ============================================================
-# PART 1: المكتبات
-# ============================================================
 import streamlit as st
 import pandas as pd
 import yfinance as yf
@@ -1639,6 +1609,5 @@ if st.session_state.logged_in:
 else:
     show_auth_page()
 
-# ============================================================
 # نهاية الكود 🎉
 # ============================================================
